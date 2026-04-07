@@ -369,6 +369,19 @@ function toggleCart() {
 window.toggleCart = toggleCart;
 
 // ===== CHECKOUT =====
+function updatePrepayAmount() {
+  let total = cart.reduce((s, item) => {
+    const p = products.find(p => p.id === item.id);
+    return s + (p ? p.price * item.qty : 0);
+  }, 0);
+  const threshold   = settings.freeDelivery || 19999;
+  const deliveryFee = total >= threshold ? 0 : 100;
+  total += deliveryFee;
+  const el = document.getElementById('prepayAmount');
+  if (el) el.textContent = 'Rs. ' + total.toLocaleString();
+}
+window.updatePrepayAmount = updatePrepayAmount;
+
 function proceedToCheckout() {
   if (cart.length === 0) { showToast('Your cart is empty!', 'error'); return; }
   toggleCart();
@@ -376,7 +389,11 @@ function proceedToCheckout() {
   document.getElementById('checkoutModal').classList.add('open');
   document.querySelectorAll('input[name="payment"]').forEach(r => {
     r.addEventListener('change', () => {
-      document.getElementById('prepayInfo').style.display = (r.value === 'prepay' && r.checked) ? 'block' : 'none';
+      const isPrepay = r.value === 'prepay' && r.checked;
+      document.getElementById('prepayInfo').style.display = isPrepay ? 'block' : 'none';
+      const tid = document.getElementById('transactionId');
+      if (tid) tid.required = isPrepay;
+      if (isPrepay) updatePrepayAmount();
     });
   });
 }
@@ -412,6 +429,7 @@ async function placeOrder(e) {
   const phone   = document.getElementById('orderPhone').value.trim();
   const address = document.getElementById('orderAddress').value.trim();
   const payment = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
+  const transactionId = payment === 'prepay' ? (document.getElementById('transactionId')?.value?.trim() || '') : '';
 
   let total = cart.reduce((s, item) => {
     const p = products.find(p => p.id === item.id);
@@ -423,6 +441,7 @@ async function placeOrder(e) {
 
   const orderData = {
     name, phone, address, payment,
+    transactionId: transactionId || 'N/A',
     items: cart.map(i => {
       const p = products.find(p => p.id === i.id);
       return { id: i.id, qty: i.qty, name: p?.name || '', price: p?.price || 0, emoji: p?.emoji || '🎁' };
@@ -464,6 +483,7 @@ async function placeOrder(e) {
         Phone:    phone,
         Address:  address,
         Payment:  payment === 'cod' ? 'Cash on Delivery' : 'Prepayment (eSewa/Khalti)',
+        TransactionID: transactionId || 'N/A',
         Items:    cart.map(i => { const p = products.find(p=>p.id===i.id); return p ? p.name+' x'+i.qty : ''; }).filter(Boolean).join(', '),
         Total:    'Rs. ' + total.toLocaleString(),
         Date:     orderData.date
@@ -477,6 +497,8 @@ async function placeOrder(e) {
     document.getElementById('orderName').value = '';
     document.getElementById('orderPhone').value = '';
     document.getElementById('orderAddress').value = '';
+    const tid = document.getElementById('transactionId');
+    if (tid) tid.value = '';
     btn.textContent = '✅ Place Order'; btn.disabled = false;
 
     showToast('🎉 Order placed! We\'ll call you to confirm.', 'success');
