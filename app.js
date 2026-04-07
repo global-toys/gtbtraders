@@ -1,9 +1,4 @@
-// ===== GLOBAL TOYS & BIRTHDAY TRADERS — FIREBASE VERSION =====
-
-// Firebase Config
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getFirestore, collection, doc, getDocs, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-storage.js";
+// ===== GLOBAL TOYS & BIRTHDAY TRADERS — FIREBASE COMPAT VERSION =====
 
 const firebaseConfig = {
   apiKey: "AIzaSyAHbCPBcjehNaKN2-vNusovsM1QoLeloCg",
@@ -14,11 +9,10 @@ const firebaseConfig = {
   appId: "1:55528878745:web:f60a422ac00c2937ea3e08"
 };
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
-const storage = getStorage(app);
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-// ===== LOCAL STATE =====
+// ===== STATE =====
 let products   = [];
 let categories = [];
 let orders     = [];
@@ -27,23 +21,23 @@ let adminCreds = JSON.parse(localStorage.getItem('gtbt_admin') || 'null') || { u
 let settings   = JSON.parse(localStorage.getItem('gtbt_settings') || 'null') || { freeDelivery: 19999 };
 
 const DEFAULT_CATEGORIES = [
-  { id: 'c1', name: 'Toys & Games', emoji: '🧸' },
-  { id: 'c2', name: 'Balloons & Decorations', emoji: '🎈' },
-  { id: 'c3', name: 'Gift Items', emoji: '🎁' },
-  { id: 'c4', name: 'Birthday Supplies', emoji: '🎂' },
-  { id: 'c5', name: 'Party Sets', emoji: '🎉' },
-  { id: 'c6', name: 'Stationery', emoji: '✏️' },
+  { name: 'Toys & Games', emoji: '🧸' },
+  { name: 'Balloons & Decorations', emoji: '🎈' },
+  { name: 'Gift Items', emoji: '🎁' },
+  { name: 'Birthday Supplies', emoji: '🎂' },
+  { name: 'Party Sets', emoji: '🎉' },
+  { name: 'Stationery', emoji: '✏️' },
 ];
 
 const DEFAULT_PRODUCTS = [
-  { name: 'Premium Balloon Set (50pcs)', category: 'c2', price: 250, stock: 100, emoji: '🎈', image: '', desc: 'Colorful assorted balloons for all occasions. 50 pieces with mixed colors.', featured: true },
-  { name: 'Remote Control Car',          category: 'c1', price: 1850, stock: 20, emoji: '🚗', image: '', desc: 'High-speed RC car with rechargeable battery. Perfect for kids aged 5+.', featured: true },
-  { name: 'Birthday Banner Set',         category: 'c4', price: 180, stock: 60, emoji: '🎀', image: '', desc: 'Beautiful "Happy Birthday" banner with stars and confetti design.', featured: true },
-  { name: 'Stuffed Teddy Bear',          category: 'c3', price: 650, stock: 35, emoji: '🧸', image: '', desc: 'Super soft and huggable teddy bear. Available in 3 sizes.', featured: true },
-  { name: 'Birthday Party Kit',          category: 'c5', price: 850, stock: 25, emoji: '🎉', image: '', desc: 'All-in-one party kit for 10 guests.', featured: false },
-  { name: 'Wooden Building Blocks',      category: 'c1', price: 480, stock: 40, emoji: '🪀', image: '', desc: 'Educational wooden blocks set with 50 pieces.', featured: false },
-  { name: 'Gift Wrapping Set',           category: 'c3', price: 120, stock: 80, emoji: '🎀', image: '', desc: 'Beautiful wrapping paper, ribbons and bow set.', featured: false },
-  { name: 'Cake Topper Set',             category: 'c4', price: 95,  stock: 55, emoji: '🎂', image: '', desc: 'Elegant birthday cake toppers with numbers and letters.', featured: false },
+  { name: 'Premium Balloon Set (50pcs)', price: 250,  stock: 100, emoji: '🎈', image: '', desc: 'Colorful assorted balloons for all occasions. 50 pieces with mixed colors.', featured: true },
+  { name: 'Remote Control Car',          price: 1850, stock: 20,  emoji: '🚗', image: '', desc: 'High-speed RC car with rechargeable battery. Perfect for kids aged 5+.', featured: true },
+  { name: 'Birthday Banner Set',         price: 180,  stock: 60,  emoji: '🎀', image: '', desc: 'Beautiful Happy Birthday banner with stars and confetti design.', featured: true },
+  { name: 'Stuffed Teddy Bear',          price: 650,  stock: 35,  emoji: '🧸', image: '', desc: 'Super soft and huggable teddy bear. Available in 3 sizes.', featured: true },
+  { name: 'Birthday Party Kit',          price: 850,  stock: 25,  emoji: '🎉', image: '', desc: 'All-in-one party kit for 10 guests.', featured: false },
+  { name: 'Wooden Building Blocks',      price: 480,  stock: 40,  emoji: '🪀', image: '', desc: 'Educational wooden blocks set with 50 pieces.', featured: false },
+  { name: 'Gift Wrapping Set',           price: 120,  stock: 80,  emoji: '🎀', image: '', desc: 'Beautiful wrapping paper, ribbons and bow set.', featured: false },
+  { name: 'Cake Topper Set',             price: 95,   stock: 55,  emoji: '🎂', image: '', desc: 'Elegant birthday cake toppers with numbers and letters.', featured: false },
 ];
 
 function saveLocal() {
@@ -52,40 +46,41 @@ function saveLocal() {
   localStorage.setItem('gtbt_settings', JSON.stringify(settings));
 }
 
-// ===== FIREBASE LOAD =====
+function hideLoader() {
+  const l = document.getElementById('pageLoader');
+  if (l) { l.style.opacity = '0'; setTimeout(() => l.style.display = 'none', 400); }
+}
+
+// ===== LOAD FROM FIREBASE =====
 async function loadFromFirebase() {
   try {
     // Load categories
-    const catSnap = await getDocs(collection(db, 'categories'));
+    const catSnap = await db.collection('categories').get();
     if (catSnap.empty) {
-      // Seed default categories
-      for (const c of DEFAULT_CATEGORIES) {
-        await addDoc(collection(db, 'categories'), c);
-      }
-      const catSnap2 = await getDocs(collection(db, 'categories'));
+      for (const c of DEFAULT_CATEGORIES) await db.collection('categories').add(c);
+      const catSnap2 = await db.collection('categories').get();
       categories = catSnap2.docs.map(d => ({ id: d.id, ...d.data() }));
     } else {
       categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
     // Load products
-    const prodSnap = await getDocs(collection(db, 'products'));
+    const prodSnap = await db.collection('products').get();
     if (prodSnap.empty) {
-      // Seed default products
-      for (const p of DEFAULT_PRODUCTS) {
-        await addDoc(collection(db, 'products'), p);
-      }
-      const prodSnap2 = await getDocs(collection(db, 'products'));
+      // Assign first category to default products
+      const firstCat = categories[0]?.id || '';
+      for (const p of DEFAULT_PRODUCTS) await db.collection('products').add({ ...p, category: firstCat });
+      const prodSnap2 = await db.collection('products').get();
       products = prodSnap2.docs.map(d => ({ id: d.id, ...d.data() }));
     } else {
       products = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     }
 
-    // Load orders
-    const ordSnap = await getDocs(query(collection(db, 'orders'), orderBy('timestamp', 'desc')));
-    orders = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Load orders (no index needed — sort in JS)
+    const ordSnap = await db.collection('orders').get();
+    orders = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    // Render everything
     renderFeatured();
     renderCategories();
     populateCategoryFilter();
@@ -93,15 +88,10 @@ async function loadFromFirebase() {
     updateCartCount();
     hideLoader();
   } catch (e) {
-    console.error('Firebase load error:', e);
+    console.error('Firebase error:', e);
     hideLoader();
-    showToast('⚠️ Could not connect to database', 'error');
+    showToast('⚠️ Connection error. Please refresh.', 'error');
   }
-}
-
-function hideLoader() {
-  const l = document.getElementById('pageLoader');
-  if (l) l.style.display = 'none';
 }
 
 // ===== NAVIGATION =====
@@ -112,14 +102,13 @@ function showSection(name) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
   if (name === 'shop') filterProducts();
   if (name === 'my-orders') renderMyOrders();
-  document.getElementById('navLinks').classList.remove('open');
+  const nav = document.getElementById('navLinks');
+  if (nav) nav.classList.remove('open');
 }
-window.showSection = showSection;
 
 function toggleNav() {
   document.getElementById('navLinks').classList.toggle('open');
 }
-window.toggleNav = toggleNav;
 
 // ===== TOAST =====
 function showToast(msg, type = '') {
@@ -154,7 +143,7 @@ function productCardHTML(p) {
         <div class="product-card-cat">${getCategoryEmoji(p.category)} ${getCategoryName(p.category)}</div>
         <h3>${p.name}</h3>
         <div class="product-card-footer">
-          <span class="product-price">Rs. ${p.price.toLocaleString()}</span>
+          <span class="product-price">Rs. ${Number(p.price).toLocaleString()}</span>
           ${p.stock > 0
             ? `<button class="add-to-cart-btn" onclick="event.stopPropagation();quickAdd('${p.id}',this)">+ Cart</button>`
             : `<span class="out-of-stock-badge">Out of Stock</span>`}
@@ -188,7 +177,6 @@ function filterByCategory(catId) {
   document.getElementById('categoryFilter').value = catId;
   filterProducts();
 }
-window.filterByCategory = filterByCategory;
 
 function populateCategoryFilter() {
   const sel = document.getElementById('categoryFilter');
@@ -221,13 +209,11 @@ function filterProducts() {
     ? filtered.map(productCardHTML).join('')
     : '<div style="padding:40px;text-align:center;color:#aaa;grid-column:1/-1;font-size:16px;font-weight:700">No products found. 😕</div>';
 }
-window.filterProducts = filterProducts;
 
 function handleSearch(val) {
   if (val.trim()) showSection('shop');
   filterProducts();
 }
-window.handleSearch = handleSearch;
 
 // ===== PRODUCT MODAL =====
 let modalQty = 1;
@@ -245,7 +231,7 @@ function openProduct(id) {
       <div class="product-modal-emoji">${imgContent}</div>
       <span class="cat-tag">${getCategoryEmoji(p.category)} ${getCategoryName(p.category)}</span>
       <h2>${p.name}</h2>
-      <div class="product-modal-price">Rs. ${p.price.toLocaleString()}</div>
+      <div class="product-modal-price">Rs. ${Number(p.price).toLocaleString()}</div>
       ${p.desc ? `<div class="product-modal-desc">${p.desc}</div>` : ''}
       <div style="font-size:13px;color:${p.stock>0?'#059669':'#E8001C'};font-weight:800">
         ${p.stock>0?`✅ In Stock (${p.stock} available)`:'❌ Out of Stock'}
@@ -258,14 +244,13 @@ function openProduct(id) {
           <span id="modalQtyDisplay">1</span>
           <button onclick="changeModalQty(1)">+</button>
         </div>
-        <span style="color:var(--blue);font-weight:800;font-size:14px" id="modalSubtotal">Rs. ${p.price.toLocaleString()}</span>
+        <span style="color:var(--blue);font-weight:800;font-size:14px" id="modalSubtotal">Rs. ${Number(p.price).toLocaleString()}</span>
       </div>
       <button class="btn-primary" style="width:100%" onclick="addToCartFromModal('${p.id}')">🛒 Add to Cart</button>
       `:''}
     </div>`;
   document.getElementById('productModal').classList.add('open');
 }
-window.openProduct = openProduct;
 
 function changeModalQty(delta) {
   const p = products.find(p => p.id === modalProductId);
@@ -274,28 +259,19 @@ function changeModalQty(delta) {
   document.getElementById('modalQtyDisplay').textContent = modalQty;
   document.getElementById('modalSubtotal').textContent = 'Rs. ' + (p.price * modalQty).toLocaleString();
 }
-window.changeModalQty = changeModalQty;
 
 function addToCartFromModal(id) { addToCart(id, modalQty); closeProductModal(); }
-window.addToCartFromModal = addToCartFromModal;
-
 function closeModal(e) { if (e.target === document.getElementById('productModal')) closeProductModal(); }
-window.closeModal = closeModal;
-
 function closeProductModal() { document.getElementById('productModal').classList.remove('open'); }
-window.closeProductModal = closeProductModal;
 
 // ===== CART =====
 function quickAdd(id, btn) {
   if (btn) {
-    btn.textContent = '✓ Added';
-    btn.style.background = '#059669'; btn.style.color = '#fff'; btn.style.borderColor = '#059669';
-    btn.disabled = true;
-    setTimeout(() => { btn.textContent = '+ Cart'; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; btn.disabled=false; }, 1200);
+    btn.textContent = '✓'; btn.style.background='#059669'; btn.style.color='#fff'; btn.style.borderColor='#059669'; btn.disabled=true;
+    setTimeout(() => { btn.textContent='+ Cart'; btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; btn.disabled=false; }, 1200);
   }
   addToCart(id, 1);
 }
-window.quickAdd = quickAdd;
 
 function addToCart(id, qty = 1) {
   const p = products.find(p => p.id === id);
@@ -303,8 +279,7 @@ function addToCart(id, qty = 1) {
   const existing = cart.find(c => c.id === id);
   if (existing) { existing.qty = Math.min(existing.qty + qty, p.stock); }
   else { cart.push({ id, qty: Math.min(qty, p.stock) }); }
-  saveLocal();
-  updateCartCount();
+  saveLocal(); updateCartCount();
   showToast('🛒 Added to cart!', 'success');
 }
 
@@ -318,9 +293,8 @@ function renderCartItems() {
   const footer    = document.getElementById('cartFooter');
   if (!container) return;
   if (cart.length === 0) {
-    container.innerHTML = `<div class="cart-empty"><p>🛒</p><strong>Your cart is empty</strong><br><span style="font-size:13px;color:#aaa;font-weight:600">Browse our products and add items!</span></div>`;
-    if (footer) footer.style.display = 'none';
-    return;
+    container.innerHTML = `<div class="cart-empty"><p>🛒</p><strong>Your cart is empty</strong><br><span style="font-size:13px;color:#aaa">Browse our products!</span></div>`;
+    if (footer) footer.style.display = 'none'; return;
   }
   if (footer) footer.style.display = 'block';
   let total = 0;
@@ -329,8 +303,8 @@ function renderCartItems() {
     if (!p) return '';
     const sub = p.price * item.qty; total += sub;
     return `<div class="cart-item">
-      <div class="cart-item-emoji">${p.image ? `<img src="${p.image}" style="width:40px;height:40px;object-fit:cover;border-radius:8px">` : p.emoji || '🎁'}</div>
-      <div class="cart-item-info"><h4>${p.name}</h4><p>Rs. ${p.price.toLocaleString()} × ${item.qty} = Rs. ${sub.toLocaleString()}</p></div>
+      <div class="cart-item-emoji">${p.image?`<img src="${p.image}" style="width:40px;height:40px;object-fit:cover;border-radius:8px">`:p.emoji||'🎁'}</div>
+      <div class="cart-item-info"><h4>${p.name}</h4><p>Rs. ${Number(p.price).toLocaleString()} × ${item.qty} = Rs. ${sub.toLocaleString()}</p></div>
       <div class="cart-item-controls">
         <button onclick="changeCartQty('${item.id}',-1)">−</button>
         <span>${item.qty}</span>
@@ -350,13 +324,11 @@ function changeCartQty(id, delta) {
   item.qty = Math.max(1, Math.min(item.qty + delta, p.stock));
   saveLocal(); renderCartItems(); updateCartCount();
 }
-window.changeCartQty = changeCartQty;
 
 function removeFromCart(id) {
   cart = cart.filter(c => c.id !== id);
   saveLocal(); renderCartItems(); updateCartCount();
 }
-window.removeFromCart = removeFromCart;
 
 function toggleCart() {
   const sidebar = document.getElementById('cartSidebar');
@@ -366,21 +338,23 @@ function toggleCart() {
   overlay.style.display = isOpen ? 'none' : 'block';
   if (!isOpen) renderCartItems();
 }
-window.toggleCart = toggleCart;
 
 // ===== CHECKOUT =====
-function updatePrepayAmount() {
-  let total = cart.reduce((s, item) => {
+function getCartTotal() {
+  let subtotal = cart.reduce((s, item) => {
     const p = products.find(p => p.id === item.id);
     return s + (p ? p.price * item.qty : 0);
   }, 0);
   const threshold   = settings.freeDelivery || 19999;
-  const deliveryFee = total >= threshold ? 0 : 100;
-  total += deliveryFee;
+  const deliveryFee = subtotal >= threshold ? 0 : 100;
+  return { subtotal, deliveryFee, total: subtotal + deliveryFee };
+}
+
+function updatePrepayAmount() {
+  const { total } = getCartTotal();
   const el = document.getElementById('prepayAmount');
   if (el) el.textContent = 'Rs. ' + total.toLocaleString();
 }
-window.updatePrepayAmount = updatePrepayAmount;
 
 function proceedToCheckout() {
   if (cart.length === 0) { showToast('Your cart is empty!', 'error'); return; }
@@ -397,22 +371,20 @@ function proceedToCheckout() {
     });
   });
 }
-window.proceedToCheckout = proceedToCheckout;
 
 function buildOrderSummary() {
-  let total = 0; let html = '';
+  const { deliveryFee, total } = getCartTotal();
+  let html = '';
   cart.forEach(item => {
     const p = products.find(p => p.id === item.id);
     if (!p) return;
-    const sub = p.price * item.qty; total += sub;
+    const sub = p.price * item.qty;
     html += `<div class="order-summary-item"><span>${p.emoji||''} ${p.name} ×${item.qty}</span><span>Rs. ${sub.toLocaleString()}</span></div>`;
   });
-  const threshold   = settings.freeDelivery || 19999;
-  const deliveryFee = total >= threshold ? 0 : 100;
   html += deliveryFee > 0
     ? `<div class="order-summary-item"><span>Delivery Fee</span><span>Rs. ${deliveryFee}</span></div>`
     : `<div class="order-summary-item"><span>Delivery Fee</span><span style="color:#059669;font-weight:800">FREE ✅</span></div>`;
-  html += `<div class="order-summary-item order-summary-total"><span>Total</span><span style="color:var(--blue)">Rs. ${(total+deliveryFee).toLocaleString()}</span></div>`;
+  html += `<div class="order-summary-item order-summary-total"><span>Total</span><span style="color:var(--blue)">Rs. ${total.toLocaleString()}</span></div>`;
   document.getElementById('orderSummary').innerHTML = html;
 }
 
@@ -421,163 +393,125 @@ function closeCheckoutModal(e) {
     document.getElementById('checkoutModal').classList.remove('open');
   }
 }
-window.closeCheckoutModal = closeCheckoutModal;
 
 async function placeOrder(e) {
   e.preventDefault();
-  const name    = document.getElementById('orderName').value.trim();
-  const phone   = document.getElementById('orderPhone').value.trim();
-  const address = document.getElementById('orderAddress').value.trim();
-  const payment = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
-  const transactionId = payment === 'prepay' ? (document.getElementById('transactionId')?.value?.trim() || '') : '';
+  const name          = document.getElementById('orderName').value.trim();
+  const phone         = document.getElementById('orderPhone').value.trim();
+  const address       = document.getElementById('orderAddress').value.trim();
+  const payment       = document.querySelector('input[name="payment"]:checked')?.value || 'cod';
+  const transactionId = payment === 'prepay' ? (document.getElementById('transactionId')?.value?.trim() || '') : 'N/A';
+  const { total }     = getCartTotal();
 
-  let total = cart.reduce((s, item) => {
-    const p = products.find(p => p.id === item.id);
-    return s + (p ? p.price * item.qty : 0);
-  }, 0);
-  const threshold   = settings.freeDelivery || 19999;
-  const deliveryFee = total >= threshold ? 0 : 100;
-  total += deliveryFee;
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.textContent = '⏳ Placing order...'; btn.disabled = true;
 
   const orderData = {
-    name, phone, address, payment,
-    transactionId: transactionId || 'N/A',
+    name, phone, address, payment, transactionId,
     items: cart.map(i => {
       const p = products.find(p => p.id === i.id);
-      return { id: i.id, qty: i.qty, name: p?.name || '', price: p?.price || 0, emoji: p?.emoji || '🎁' };
+      return { id: i.id, qty: i.qty, name: p?.name||'', price: p?.price||0, emoji: p?.emoji||'🎁' };
     }),
     total,
-    status: 'Pending',
-    date: new Date().toLocaleString('en-NP', { timeZone: 'Asia/Kathmandu' }),
+    status:    'Pending',
+    date:      new Date().toLocaleString('en-NP', { timeZone: 'Asia/Kathmandu' }),
     timestamp: Date.now()
   };
 
   try {
-    const btn = e.target.querySelector('button[type="submit"]');
-    btn.textContent = 'Placing order...'; btn.disabled = true;
-
-    // Save to Firebase
-    const docRef = await addDoc(collection(db, 'orders'), orderData);
+    const docRef  = await db.collection('orders').add(orderData);
     const orderId = docRef.id;
-
-    // Save phone for "My Orders" tracking
     localStorage.setItem('gtbt_my_phone', phone);
 
-    // Reduce stock in Firebase
+    // Reduce stock
     for (const item of cart) {
       const p = products.find(p => p.id === item.id);
       if (p) {
         const newStock = Math.max(0, p.stock - item.qty);
-        await updateDoc(doc(db, 'products', item.id), { stock: newStock });
+        await db.collection('products').doc(item.id).update({ stock: newStock });
         p.stock = newStock;
       }
     }
 
-    // Send email via Formspree
+    // Formspree email
     fetch('https://formspree.io/f/mbdppekw', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        OrderID:  orderId,
-        Name:     name,
-        Phone:    phone,
-        Address:  address,
-        Payment:  payment === 'cod' ? 'Cash on Delivery' : 'Prepayment (eSewa/Khalti)',
-        TransactionID: transactionId || 'N/A',
-        Items:    cart.map(i => { const p = products.find(p=>p.id===i.id); return p ? p.name+' x'+i.qty : ''; }).filter(Boolean).join(', '),
-        Total:    'Rs. ' + total.toLocaleString(),
-        Date:     orderData.date
+        OrderID: orderId.slice(-6).toUpperCase(),
+        Name: name, Phone: phone, Address: address,
+        Payment: payment === 'cod' ? 'Cash on Delivery' : 'Prepayment',
+        TransactionID: transactionId,
+        Items: cart.map(i => { const p=products.find(p=>p.id===i.id); return p?p.name+' x'+i.qty:''; }).filter(Boolean).join(', '),
+        Total: 'Rs. ' + total.toLocaleString(),
+        Date: orderData.date
       })
     }).catch(() => {});
 
-    cart = [];
-    saveLocal();
-    updateCartCount();
+    cart = []; saveLocal(); updateCartCount();
     closeCheckoutModal();
-    document.getElementById('orderName').value = '';
-    document.getElementById('orderPhone').value = '';
-    document.getElementById('orderAddress').value = '';
-    const tid = document.getElementById('transactionId');
-    if (tid) tid.value = '';
+    ['orderName','orderPhone','orderAddress'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+    const tid = document.getElementById('transactionId'); if(tid) tid.value='';
     btn.textContent = '✅ Place Order'; btn.disabled = false;
 
-    showToast('🎉 Order placed! We\'ll call you to confirm.', 'success');
+    showToast('🎉 Order placed! We\'ll call you soon.', 'success');
     setTimeout(() => {
-      alert(`✅ Order Confirmed!\n\nOrder ID: ${orderId}\nName: ${name}\nPhone: ${phone}\nPayment: ${payment==='cod'?'Cash on Delivery':'Prepayment'}\nTotal: Rs. ${total.toLocaleString()}\n\nTrack your order by clicking "My Orders" and entering your phone number!\n\nThank you for shopping with Global Toys & Birthday Traders! 🎁`);
-    }, 400);
+      alert(`✅ Order Confirmed!\n\nOrder ID: #${orderId.slice(-6).toUpperCase()}\nName: ${name}\nPhone: ${phone}\nPayment: ${payment==='cod'?'Cash on Delivery':'Prepayment'}\nTotal: Rs. ${total.toLocaleString()}\n\n📦 Track your order:\nClick "My Orders" and enter your phone: ${phone}\n\nThank you! 🎁`);
+    }, 300);
 
   } catch (err) {
     console.error(err);
     showToast('❌ Failed to place order. Please try again.', 'error');
-    const btn = e.target.querySelector('button[type="submit"]');
     btn.textContent = '✅ Place Order'; btn.disabled = false;
   }
 }
-window.placeOrder = placeOrder;
 
-// ===== MY ORDERS (Customer) =====
+// ===== MY ORDERS =====
 async function renderMyOrders() {
-  const phone = document.getElementById('myOrderPhone')?.value?.trim() ||
-                localStorage.getItem('gtbt_my_phone') || '';
-  if (document.getElementById('myOrderPhone')) {
-    document.getElementById('myOrderPhone').value = phone;
-  }
+  const phoneInput = document.getElementById('myOrderPhone');
+  const phone = (phoneInput?.value?.trim()) || localStorage.getItem('gtbt_my_phone') || '';
+  if (phoneInput && phone) phoneInput.value = phone;
+  const container = document.getElementById('myOrdersList');
   if (!phone) {
-    document.getElementById('myOrdersList').innerHTML = `
-      <div style="text-align:center;padding:40px;color:var(--text2)">
-        <p style="font-size:48px">📦</p>
-        <p style="font-weight:700;margin-top:12px">Enter your phone number to track your orders</p>
-      </div>`;
+    container.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text2)"><p style="font-size:48px">📦</p><p style="font-weight:700;margin-top:12px">Enter your phone number above to track your orders</p></div>`;
     return;
   }
-  document.getElementById('myOrdersList').innerHTML = '<div style="text-align:center;padding:40px">⏳ Loading orders...</div>';
+  container.innerHTML = '<div style="text-align:center;padding:40px;font-weight:700">⏳ Loading your orders...</div>';
   try {
-    const q = query(collection(db, 'orders'), where('phone', '==', phone), orderBy('timestamp', 'desc'));
-    const snap = await getDocs(q);
+    const snap = await db.collection('orders').where('phone', '==', phone).get();
     if (snap.empty) {
-      document.getElementById('myOrdersList').innerHTML = `
-        <div style="text-align:center;padding:40px;color:var(--text2)">
-          <p style="font-size:48px">🔍</p>
-          <p style="font-weight:700;margin-top:12px">No orders found for ${phone}</p>
-          <p style="font-size:13px;margin-top:6px">Make sure you enter the same phone number used while ordering</p>
-        </div>`;
+      container.innerHTML = `<div style="text-align:center;padding:60px;color:var(--text2)"><p style="font-size:48px">🔍</p><p style="font-weight:700;margin-top:12px">No orders found for ${phone}</p><p style="font-size:13px;margin-top:6px">Use the same phone number you ordered with</p></div>`;
       return;
     }
-    const myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const statusColor = { Pending: '#D97706', Confirmed: '#2563EB', Delivered: '#059669', Cancelled: '#DC2626' };
-    const statusEmoji = { Pending: '⏳', Confirmed: '✅', Delivered: '🚚', Cancelled: '❌' };
-    document.getElementById('myOrdersList').innerHTML = myOrders.map(o => `
+    const myOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.timestamp||0) - (a.timestamp||0));
+    const statusColor = { Pending:'#D97706', Confirmed:'#2563EB', Delivered:'#059669', Cancelled:'#DC2626' };
+    const statusEmoji = { Pending:'⏳', Confirmed:'✅', Delivered:'🚚', Cancelled:'❌' };
+    container.innerHTML = myOrders.map(o => `
       <div class="my-order-card">
         <div class="my-order-header">
-          <div>
-            <h4>Order #${o.id.slice(-6).toUpperCase()}</h4>
-            <p style="font-size:12px;color:#aaa;margin-top:2px">${o.date}</p>
-          </div>
-          <span class="my-order-status" style="background:${statusColor[o.status]||'#666'}20;color:${statusColor[o.status]||'#666'}">
-            ${statusEmoji[o.status]||'📦'} ${o.status}
-          </span>
+          <div><h4>Order #${o.id.slice(-6).toUpperCase()}</h4><p style="font-size:12px;color:#aaa;margin-top:2px">${o.date||''}</p></div>
+          <span class="my-order-status" style="background:${(statusColor[o.status]||'#666')}20;color:${statusColor[o.status]||'#666'}">${statusEmoji[o.status]||'📦'} ${o.status}</span>
         </div>
-        <div class="my-order-items">
-          ${o.items.map(i => `<span>${i.emoji||'🎁'} ${i.name} ×${i.qty}</span>`).join('')}
-        </div>
+        <div class="my-order-items">${(o.items||[]).map(i=>`<span>${i.emoji||'🎁'} ${i.name} ×${i.qty}</span>`).join('')}</div>
         <div class="my-order-footer">
-          <span style="font-weight:800;color:var(--blue)">Rs. ${o.total.toLocaleString()}</span>
+          <span style="font-weight:800;color:var(--blue)">Rs. ${Number(o.total).toLocaleString()}</span>
           <span style="font-size:13px;color:var(--text2)">${o.payment==='cod'?'💵 Cash on Delivery':'📲 Prepayment'}</span>
         </div>
-        <div style="font-size:13px;color:var(--text2);margin-top:8px">📍 ${o.address}</div>
+        <div style="font-size:13px;color:var(--text2);margin-top:8px">📍 ${o.address||''}</div>
       </div>`).join('');
   } catch (err) {
     console.error(err);
-    document.getElementById('myOrdersList').innerHTML = '<div style="text-align:center;padding:40px;color:red">Failed to load orders.</div>';
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:red;font-weight:700">Failed to load. Please try again.</div>';
   }
 }
-window.renderMyOrders = renderMyOrders;
 
 function searchMyOrders() {
   const phone = document.getElementById('myOrderPhone').value.trim();
-  if (phone) { localStorage.setItem('gtbt_my_phone', phone); renderMyOrders(); }
+  if (!phone) { showToast('Please enter your phone number', 'error'); return; }
+  localStorage.setItem('gtbt_my_phone', phone);
+  renderMyOrders();
 }
-window.searchMyOrders = searchMyOrders;
 
 // ===== CONTACT =====
 function submitContact(e) {
@@ -585,14 +519,10 @@ function submitContact(e) {
   showToast('✅ Message sent! We\'ll get back to you soon.', 'success');
   e.target.reset();
 }
-window.submitContact = submitContact;
 
 // ===== ADMIN =====
 function showAdminLogin() { document.getElementById('adminLoginModal').classList.add('open'); }
-window.showAdminLogin = showAdminLogin;
-
 function closeAdminLogin() { document.getElementById('adminLoginModal').classList.remove('open'); }
-window.closeAdminLogin = closeAdminLogin;
 
 async function adminLogin(e) {
   e.preventDefault();
@@ -602,31 +532,25 @@ async function adminLogin(e) {
     closeAdminLogin();
     document.getElementById('adminPanel').style.display = 'flex';
     document.getElementById('adminPanel').style.flexDirection = 'column';
-    // Reload fresh data
-    const prodSnap = await getDocs(collection(db, 'products'));
+    const prodSnap = await db.collection('products').get();
     products = prodSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const ordSnap  = await getDocs(query(collection(db, 'orders'), orderBy('timestamp', 'desc')));
-    orders = ordSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const catSnap  = await getDocs(collection(db, 'categories'));
+    const ordSnap  = await db.collection('orders').get();
+    orders = ordSnap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b)=>(b.timestamp||0)-(a.timestamp||0));
+    const catSnap  = await db.collection('categories').get();
     categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderAdminProducts();
-    renderAdminOrders();
-    renderAdminCategories();
-    populateAdminCategorySelect();
-    loadAdminSettings();
+    renderAdminProducts(); renderAdminOrders(); renderAdminCategories();
+    populateAdminCategorySelect(); loadAdminSettings();
     document.getElementById('adminUser').value = '';
     document.getElementById('adminPass').value = '';
   } else {
     showToast('❌ Invalid username or password', 'error');
   }
 }
-window.adminLogin = adminLogin;
 
 function exitAdmin() {
   document.getElementById('adminPanel').style.display = 'none';
   renderFeatured(); renderCategories(); populateCategoryFilter(); filterProducts();
 }
-window.exitAdmin = exitAdmin;
 
 function adminTab(name) {
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
@@ -637,48 +561,36 @@ function adminTab(name) {
     if (b.getAttribute('onclick')?.includes("'" + name + "'")) b.classList.add('active');
   });
 }
-window.adminTab = adminTab;
 
-// ADMIN PRODUCTS
 function renderAdminProducts() {
   const search   = (document.getElementById('adminProductSearch')?.value || '').toLowerCase();
   const filtered = products.filter(p => !search || p.name.toLowerCase().includes(search));
   const container = document.getElementById('adminProductsTable');
   if (!container) return;
-  if (!filtered.length) { container.innerHTML = '<div style="padding:24px;text-align:center;color:#aaa;font-weight:700">No products found.</div>'; return; }
+  if (!filtered.length) { container.innerHTML = '<div style="padding:24px;text-align:center;color:#aaa">No products found.</div>'; return; }
   container.innerHTML = filtered.map(p => `
     <div class="admin-product-row">
-      <div class="admin-product-emoji">${p.image ? `<img src="${p.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">` : p.emoji||'🎁'}</div>
-      <div class="admin-product-info">
-        <h4>${p.name}</h4>
-        <p>${getCategoryName(p.category)}${p.featured?' • ⭐ Featured':''}</p>
-      </div>
-      <div>
-        <div class="admin-product-price">Rs. ${p.price.toLocaleString()}</div>
-        <div class="admin-product-stock">Stock: ${p.stock}</div>
-      </div>
+      <div class="admin-product-emoji">${p.image?`<img src="${p.image}" style="width:44px;height:44px;object-fit:cover;border-radius:8px">`:p.emoji||'🎁'}</div>
+      <div class="admin-product-info"><h4>${p.name}</h4><p>${getCategoryName(p.category)}${p.featured?' • ⭐':''}</p></div>
+      <div><div class="admin-product-price">Rs. ${Number(p.price).toLocaleString()}</div><div class="admin-product-stock">Stock: ${p.stock}</div></div>
       <div class="admin-product-actions">
         <button class="edit-btn" onclick="openEditProduct('${p.id}')">✏️ Edit</button>
         <button class="delete-btn" onclick="deleteProduct('${p.id}')">🗑 Delete</button>
       </div>
     </div>`).join('');
 }
-window.renderAdminProducts = renderAdminProducts;
 
 function openAddProduct() {
   document.getElementById('productFormTitle').textContent = '+ Add New Product';
-  ['pName','pPrice','pStock','pDesc','pEmoji','pImage','pEditId'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
+  ['pName','pPrice','pStock','pDesc','pEmoji','pImage','pEditId'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('pFeatured').checked = false;
-  document.getElementById('pImagePreview').style.display = 'none';
+  const prev = document.getElementById('pImagePreview'); if(prev) prev.style.display='none';
+  const stat = document.getElementById('pImageUploadStatus'); if(stat) stat.textContent='';
   adminTab('add-product');
 }
-window.openAddProduct = openAddProduct;
 
 function openEditProduct(id) {
-  const p = products.find(p => p.id === id);
-  if (!p) return;
+  const p = products.find(p => p.id === id); if (!p) return;
   document.getElementById('productFormTitle').textContent = '✏️ Edit Product';
   document.getElementById('pName').value     = p.name;
   document.getElementById('pCategory').value = p.category;
@@ -690,44 +602,23 @@ function openEditProduct(id) {
   document.getElementById('pFeatured').checked = !!p.featured;
   document.getElementById('pEditId').value   = id;
   const preview = document.getElementById('pImagePreview');
-  if (p.image) { preview.src = p.image; preview.style.display = 'block'; }
-  else { preview.style.display = 'none'; }
+  if (preview) { if(p.image){preview.src=p.image;preview.style.display='block';}else{preview.style.display='none';} }
   adminTab('add-product');
 }
-window.openEditProduct = openEditProduct;
 
-// Image upload preview
 function handleImageFile(input) {
-  const file = input.files[0];
-  if (!file) return;
+  const file = input.files[0]; if (!file) return;
   const preview = document.getElementById('pImagePreview');
-  preview.src = URL.createObjectURL(file);
-  preview.style.display = 'block';
-  document.getElementById('pImageUploadStatus').textContent = '📁 ' + file.name + ' selected';
+  if (preview) { preview.src = URL.createObjectURL(file); preview.style.display = 'block'; }
+  const stat = document.getElementById('pImageUploadStatus');
+  if (stat) stat.textContent = '⚠️ Upload image to Imgur.com and paste the URL below';
 }
-window.handleImageFile = handleImageFile;
 
 async function saveProduct(e) {
   e.preventDefault();
   const editId = document.getElementById('pEditId').value;
   const btn    = e.target.querySelector('button[type="submit"]');
   btn.textContent = '⏳ Saving...'; btn.disabled = true;
-
-  let imageUrl = document.getElementById('pImage').value.trim();
-
-  // Handle file upload if a file was selected
-  const fileInput = document.getElementById('pImageFile');
-  if (fileInput && fileInput.files.length > 0) {
-    try {
-      const file     = fileInput.files[0];
-      const storageRef = ref(storage, 'products/' + Date.now() + '_' + file.name);
-      await uploadBytes(storageRef, file);
-      imageUrl = await getDownloadURL(storageRef);
-    } catch (err) {
-      showToast('⚠️ Image upload failed, saving without image', 'error');
-    }
-  }
-
   const data = {
     name:     document.getElementById('pName').value.trim(),
     category: document.getElementById('pCategory').value,
@@ -735,67 +626,61 @@ async function saveProduct(e) {
     stock:    parseInt(document.getElementById('pStock').value),
     desc:     document.getElementById('pDesc').value.trim(),
     emoji:    document.getElementById('pEmoji').value.trim(),
-    image:    imageUrl,
+    image:    document.getElementById('pImage').value.trim(),
     featured: document.getElementById('pFeatured').checked,
   };
-
   try {
     if (editId) {
-      await updateDoc(doc(db, 'products', editId), data);
+      await db.collection('products').doc(editId).update(data);
       const idx = products.findIndex(p => p.id === editId);
       if (idx !== -1) products[idx] = { ...products[idx], ...data };
       showToast('✅ Product updated!', 'success');
     } else {
-      const docRef = await addDoc(collection(db, 'products'), data);
+      const docRef = await db.collection('products').add(data);
       products.unshift({ id: docRef.id, ...data });
       showToast('✅ Product added!', 'success');
     }
     btn.textContent = '💾 Save Product'; btn.disabled = false;
-    if (fileInput) fileInput.value = '';
-    document.getElementById('pImageUploadStatus').textContent = '';
-    adminTab('products');
-    renderAdminProducts();
+    adminTab('products'); renderAdminProducts();
   } catch (err) {
-    showToast('❌ Failed to save product', 'error');
+    console.error(err);
+    showToast('❌ Failed to save. Check connection.', 'error');
     btn.textContent = '💾 Save Product'; btn.disabled = false;
   }
 }
-window.saveProduct = saveProduct;
 
 async function deleteProduct(id) {
   if (!confirm('Delete this product?')) return;
   try {
-    await deleteDoc(doc(db, 'products', id));
+    await db.collection('products').doc(id).delete();
     products = products.filter(p => p.id !== id);
-    renderAdminProducts();
-    showToast('🗑 Product deleted', '');
+    renderAdminProducts(); showToast('🗑 Product deleted', '');
   } catch (err) { showToast('❌ Failed to delete', 'error'); }
 }
-window.deleteProduct = deleteProduct;
 
 function populateAdminCategorySelect() {
   const sel = document.getElementById('pCategory');
   if (sel) sel.innerHTML = categories.map(c => `<option value="${c.id}">${c.emoji} ${c.name}</option>`).join('');
 }
 
-// ADMIN ORDERS
 function renderAdminOrders() {
   const container = document.getElementById('adminOrdersList');
   if (!container) return;
   if (!orders.length) { container.innerHTML = '<div style="padding:40px;text-align:center;color:#aaa;font-weight:700">No orders yet.</div>'; return; }
   container.innerHTML = orders.map(o => {
-    const itemsList = o.items.map(i => `${i.emoji||'🎁'} ${i.name} ×${i.qty}`).join(', ');
+    const itemsList = (o.items||[]).map(i=>`${i.emoji||'🎁'} ${i.name} ×${i.qty}`).join(', ');
     return `<div class="order-card">
       <div class="order-card-header">
-        <div><h4>Order #${o.id.slice(-6).toUpperCase()}</h4><p style="font-size:12px;color:#aaa;margin-top:2px;font-weight:600">${o.date}</p></div>
+        <div><h4>Order #${o.id.slice(-6).toUpperCase()}</h4><p style="font-size:12px;color:#aaa;margin-top:2px">${o.date||''}</p></div>
         <span class="order-status ${o.status==='Pending'?'status-pending':'status-confirmed'}">${o.status}</span>
       </div>
-      <div style="font-size:14px;margin-bottom:6px;font-weight:800">👤 ${o.name} &nbsp;|&nbsp; 📞 ${o.phone}</div>
-      <div style="font-size:13px;color:#666;margin-bottom:6px;font-weight:600">📍 ${o.address}</div>
-      <div style="font-size:13px;color:#888;margin-bottom:10px;font-weight:700">💳 ${o.payment==='cod'?'Cash on Delivery':'Prepayment'}</div>
+      <div style="font-size:14px;margin-bottom:6px;font-weight:800">👤 ${o.name} | 📞 ${o.phone}</div>
+      <div style="font-size:13px;color:#666;margin-bottom:4px">📍 ${o.address}</div>
+      <div style="font-size:13px;color:#888;margin-bottom:4px">💳 ${o.payment==='cod'?'Cash on Delivery':'Prepayment'}</div>
+      ${o.transactionId&&o.transactionId!=='N/A'?`<div style="font-size:13px;color:#059669;margin-bottom:8px;font-weight:700">🧾 Txn ID: ${o.transactionId}</div>`:''}
       <div class="order-items-list">${itemsList}</div>
       <div class="order-footer">
-        <div class="order-total">Rs. ${o.total.toLocaleString()}</div>
+        <div class="order-total">Rs. ${Number(o.total).toLocaleString()}</div>
         <select onchange="updateOrderStatus('${o.id}',this.value)">
           <option ${o.status==='Pending'   ?'selected':''}>Pending</option>
           <option ${o.status==='Confirmed' ?'selected':''}>Confirmed</option>
@@ -809,22 +694,19 @@ function renderAdminOrders() {
 
 async function updateOrderStatus(id, status) {
   try {
-    await updateDoc(doc(db, 'orders', id), { status });
-    const o = orders.find(o => o.id === id);
-    if (o) o.status = status;
-    showToast('✅ Order status updated!', 'success');
-  } catch (err) { showToast('❌ Failed to update status', 'error'); }
+    await db.collection('orders').doc(id).update({ status });
+    const o = orders.find(o => o.id === id); if(o) o.status = status;
+    showToast('✅ Status updated!', 'success');
+  } catch (err) { showToast('❌ Failed to update', 'error'); }
 }
-window.updateOrderStatus = updateOrderStatus;
 
-// ADMIN CATEGORIES
 function renderAdminCategories() {
   const container = document.getElementById('categoriesList');
   if (!container) return;
   container.innerHTML = categories.map(c => `
     <div class="cat-admin-item">
       <div class="cat-info"><span>${c.emoji}</span><span>${c.name}</span>
-        <span style="color:#aaa;font-size:13px;font-weight:600">(${products.filter(p=>p.category===c.id).length} products)</span>
+        <span style="color:#aaa;font-size:13px">(${products.filter(p=>p.category===c.id).length} products)</span>
       </div>
       <div class="admin-product-actions">
         <button class="delete-btn" onclick="deleteCategory('${c.id}')">🗑 Remove</button>
@@ -833,36 +715,30 @@ function renderAdminCategories() {
 }
 
 async function addCategory() {
-  const name = prompt('Category name:');
-  if (!name) return;
+  const name = prompt('Category name:'); if (!name) return;
   const emoji = prompt('Category emoji (e.g. 🎈):') || '📦';
   try {
-    const docRef = await addDoc(collection(db, 'categories'), { name: name.trim(), emoji });
+    const docRef = await db.collection('categories').add({ name: name.trim(), emoji });
     categories.push({ id: docRef.id, name: name.trim(), emoji });
     renderAdminCategories(); populateCategoryFilter(); populateAdminCategorySelect(); renderCategories();
     showToast('✅ Category added!', 'success');
-  } catch (err) { showToast('❌ Failed to add category', 'error'); }
+  } catch (err) { showToast('❌ Failed', 'error'); }
 }
-window.addCategory = addCategory;
 
 async function deleteCategory(id) {
-  if (products.some(p => p.category === id)) { showToast('⚠️ Cannot delete: products use this category.', 'error'); return; }
+  if (products.some(p => p.category === id)) { showToast('⚠️ Products use this category!', 'error'); return; }
   if (!confirm('Delete this category?')) return;
   try {
-    await deleteDoc(doc(db, 'categories', id));
+    await db.collection('categories').doc(id).delete();
     categories = categories.filter(c => c.id !== id);
     renderAdminCategories(); populateCategoryFilter(); renderCategories();
-    showToast('🗑 Category removed', '');
-  } catch (err) { showToast('❌ Failed to delete', 'error'); }
+    showToast('🗑 Removed', '');
+  } catch (err) { showToast('❌ Failed', 'error'); }
 }
-window.deleteCategory = deleteCategory;
 
-// ADMIN SETTINGS
 function loadAdminSettings() {
-  const u = document.getElementById('setUser');
-  const fd = document.getElementById('setFreeDelivery');
-  if (u)  u.value  = adminCreds.user || '';
-  if (fd) fd.value = settings.freeDelivery || 19999;
+  const u  = document.getElementById('setUser');      if(u)  u.value  = adminCreds.user||'';
+  const fd = document.getElementById('setFreeDelivery'); if(fd) fd.value = settings.freeDelivery||19999;
 }
 
 function saveSettings(e) {
@@ -870,15 +746,13 @@ function saveSettings(e) {
   const newUser = document.getElementById('setUser').value.trim();
   const newPass = document.getElementById('setPass').value;
   const ann     = document.getElementById('setAnnouncement').value.trim();
-  const fd      = parseInt(document.getElementById('setFreeDelivery').value) || 19999;
+  const fd      = parseInt(document.getElementById('setFreeDelivery').value)||19999;
   if (newUser) adminCreds.user = newUser;
   if (newPass) adminCreds.pass = newPass;
-  if (ann) { const bar = document.querySelector('.ann-scroll'); if (bar) bar.textContent = ann; }
+  if (ann) { const bar=document.querySelector('.ann-scroll'); if(bar) bar.textContent=ann; }
   settings.freeDelivery = fd;
-  saveLocal();
-  showToast('✅ Settings saved!', 'success');
+  saveLocal(); showToast('✅ Settings saved!', 'success');
 }
-window.saveSettings = saveSettings;
 
 // ===== INIT =====
 loadFromFirebase();
